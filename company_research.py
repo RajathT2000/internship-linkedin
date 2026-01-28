@@ -1,6 +1,6 @@
 """
 MQ PACE Company Research Tool
-Finds companies offering internships in Sydney and extracts contact details
+Searches job boards for companies, scrapes their websites for team members
 """
 
 import time
@@ -19,7 +19,359 @@ class CompanyResearcher:
         """Initialize the research tool."""
         self.driver = None
         self.companies_data = []
-        self.contacts_without_linkedin = []
+        self.all_contacts = []
+        
+    def setup_driver(self):
+        """Setup undetected ChromeDriver."""
+        print("Setting up Chrome driver...")
+        options = uc.ChromeOptions()
+        options.add_argument('--start-maximized')
+        
+        self.driver = uc.Chrome(options=options)
+        self.wait = WebDriverWait(self.driver, 15)
+        print("Chrome driver ready!")
+    
+    def search_job_boards_for_companies(self):
+        """Search Seek and Indeed for companies offering internships in Sydney."""
+        print("\n" + "="*60)
+        print("SEARCHING JOB BOARDS FOR COMPANIES")
+        print("="*60)
+        
+        companies_found = set()
+        job_boards = [
+            ('Seek', 'https://www.seek.com.au/internship-jobs/in-Sydney-NSW?daterange=31'),
+            ('Indeed', 'https://au.indeed.com/jobs?q=internship&l=Sydney+NSW'),
+            ('Jora', 'https://au.jora.com/jobs?q=internship&l=Sydney+NSW')
+        ]
+        
+        for board_name, url in job_boards:
+            try:
+                print(f"\nSearching {board_name}...")
+                self.driver.get(url)
+                time.sleep(3)
+                
+                # Extract company names from job listings
+                if board_name == 'Seek':
+                    company_elements = self.driver.find_elements(By.XPATH, '//a[@data-automation="jobCompany"]')
+                elif board_name == 'Indeed':
+                    company_elements = self.driver.find_elements(By.XPATH, '//span[@class="companyName"]')
+                else:  # Jora
+                    company_elements = self.driver.find_elements(By.XPATH, '//div[contains(@class, "company")]')
+                
+                for element in company_elements[:30]:  # Check first 30 listings
+                    try:
+                        company_name = element.text.strip()
+                        if company_name and len(company_name) > 2:
+                            companies_found.add(company_name)
+                            print(f"  ✓ Found: {company_name}")
+                    except:
+                        continue
+                
+                if len(companies_found) >= 20:
+                    break
+                    
+            except Exception as e:
+                print(f"Error searching {board_name}: {str(e)}")
+                continue
+        
+        companies_list = list(companies_found)[:20]
+        print(f"\n✓ Found {len(companies_list)} companies offering internships")
+        return companies_list
+    
+    def find_company_website(self, company_name):
+        """Find the official website of a company."""
+        try:
+            search_query = f"{company_name} Sydney Australia official website"
+            google_url = f'https://www.google.com/search?q={search_query.replace(" ", "+")}'
+            
+            self.driver.get(google_url)
+            time.sleep(2)
+            
+            # Get first result that's not LinkedIn, Indeed, Seek, etc.
+            links = self.driver.find_elements(By.XPATH, '//div[@class="g"]//a')
+            
+            for link in links[:5]:
+                try:
+                    url = link.get_attribute('href')
+                    if url and not any(x in url.lower() for x in ['linkedin', 'indeed', 'seek', 'jora', 'google', 'facebook']):
+                        print(f"  Found website: {url}")
+                        return url
+                except:
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error finding website: {str(e)}")
+            return None
+    
+    def scrape_team_members_from_website(self, company_name, website_url):
+        """Scrape team member information from company website."""
+        print(f"\nScraping {website_url} for team members...")
+        
+        team_members = []
+        
+        try:
+            # Visit main website
+            self.driver.get(website_url)
+            time.sleep(3)
+            
+            # Look for team/about/people pages
+            team_page_keywords = ['team', 'about', 'people', 'leadership', 'staff', 'our-team', 'about-us']
+            team_page_url = None
+            
+            # Find links to team pages
+            all_links = self.driver.find_elements(By.TAG_NAME, 'a')
+            
+            for link in all_links:
+                try:
+                    href = link.get_attribute('href')
+                    text = link.text.lower()
+                    
+                    if href and any(keyword in href.lower() or keyword in text for keyword in team_page_keywords):
+                        team_page_url = href
+                        print(f"  Found team page: {team_page_url}")
+                        break
+                except:
+                    continue
+            
+            # Visit team page if found
+            if team_page_url:
+                self.driver.get(team_page_url)
+                time.sleep(3)
+            
+            # Extract text content
+            page_text = self.driver.find_element(By.TAG_NAME, 'body').text
+            
+            # Look for names (simple heuristic: capitalized words, 2-4 words)
+            name_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b'
+            potential_names = re.findall(name_pattern, page_text)
+            
+            # Filter for likely real names
+            common_titles = ['CEO', 'CTO', 'Director', 'Manager', 'Lead', 'Engineer', 'Developer', 'Designer', 'Analyst']
+            
+            # Look for LinkedIn links on the page
+            linkedin_links = self.driver.find_elements(By.XPATH, '//a[contains(@href, "linkedin.com/in/")]')
+            linkedin_profiles = {}
+            
+            for link in linkedin_links:
+                try:
+                    url = link.get_attribute('href')
+                    # Try to find associated name nearby
+                    parent = link.find_element(By.XPATH, './../..')
+                    nearby_text = parent.text
+                    
+                    for name in potential_names:
+                        if name in nearby_text:
+                            linkedin_profiles[name] = url
+                            break
+                except:
+                    continue
+            
+            # Extract team members
+            seen_names = set()
+            for name in potential_names:
+                # Skip common non-names
+                if name in seen_names or len(name) < 5:
+                    continue
+                    
+                # Check if it's near a job title
+                context_start = max(0, page_text.find(name) - 100)
+                context_end = min(len(page_text), page_text.find(name) + 100)
+                context = page_text[context_start:context_end].lower()
+                
+                has_title = any(title.lower() in context for title in common_titles)
+                
+                if has_title or name in linkedin_profiles:
+                    team_member = {
+                        'name': name,
+                        'company': company_name,
+                        'linkedin_url': linkedin_profiles.get(name, 'Not found'),
+                        'source': 'company_website'
+                    }
+                    team_members.append(team_member)
+                    seen_names.add(name)
+                    print(f"  ✓ Found: {name}")
+                    
+                    if len(team_members) >= 2:
+                        break
+            
+            # If not enough found, search Google for company team members
+            if len(team_members) < 2:
+                print(f"  Only found {len(team_members)} on website, searching Google...")
+                google_members = self.search_google_for_team_members(company_name)
+                team_members.extend(google_members)
+            
+            return team_members[:2]  # Return max 2
+            
+        except Exception as e:
+            print(f"Error scraping website: {str(e)}")
+            return []
+    
+    def search_google_for_team_members(self, company_name):
+        """Search Google for team members if website scraping fails."""
+        try:
+            search_query = f"{company_name} Sydney team members site:linkedin.com/in"
+            google_url = f'https://www.google.com/search?q={search_query.replace(" ", "+")}'
+            
+            self.driver.get(google_url)
+            time.sleep(2)
+            
+            team_members = []
+            links = self.driver.find_elements(By.XPATH, '//a[@href]')
+            
+            for link in links[:5]:
+                try:
+                    url = link.get_attribute('href')
+                    text = link.text.strip()
+                    
+                    if url and 'linkedin.com/in/' in url and text and len(text.split()) >= 2:
+                        # Clean URL
+                        if 'url?q=' in url:
+                            url = url.split('url?q=')[1].split('&')[0]
+                        
+                        team_member = {
+                            'name': text,
+                            'company': company_name,
+                            'linkedin_url': url,
+                            'source': 'google_search'
+                        }
+                        team_members.append(team_member)
+                        print(f"  ✓ Found via Google: {text}")
+                        
+                        if len(team_members) >= 2:
+                            break
+                except:
+                    continue
+            
+            return team_members
+            
+        except Exception as e:
+            print(f"Error searching Google: {str(e)}")
+            return []
+    
+    def save_results(self):
+        """Save all research results to files."""
+        print("\n" + "="*60)
+        print("SAVING RESULTS")
+        print("="*60)
+        
+        # Save all contacts to CSV
+        if self.all_contacts:
+            df = pd.DataFrame(self.all_contacts)
+            df.to_csv('company_contacts.csv', index=False)
+            print(f"✓ Saved {len(self.all_contacts)} contacts to company_contacts.csv")
+        
+        # Save names without LinkedIn to text file
+        contacts_without_linkedin = [c for c in self.all_contacts if c['linkedin_url'] == 'Not found']
+        
+        if contacts_without_linkedin:
+            with open('names_to_search.txt', 'w', encoding='utf-8') as f:
+                f.write("NAMES TO SEARCH ON LINKEDIN\n")
+                f.write("="*60 + "\n\n")
+                
+                for contact in contacts_without_linkedin:
+                    f.write(f"{contact['name']} - {contact['company']}\n")
+            
+            print(f"✓ Saved {len(contacts_without_linkedin)} names to names_to_search.txt")
+        
+        # Save detailed report
+        with open('research_summary.txt', 'w', encoding='utf-8') as f:
+            f.write("COMPANY RESEARCH SUMMARY\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("="*60 + "\n\n")
+            
+            companies_processed = {}
+            for contact in self.all_contacts:
+                company = contact['company']
+                if company not in companies_processed:
+                    companies_processed[company] = []
+                companies_processed[company].append(contact)
+            
+            for company, contacts in companies_processed.items():
+                f.write(f"COMPANY: {company}\n")
+                f.write(f"Team Members Found: {len(contacts)}\n\n")
+                
+                for contact in contacts:
+                    f.write(f"  Name: {contact['name']}\n")
+                    f.write(f"  LinkedIn: {contact['linkedin_url']}\n")
+                    f.write(f"  Source: {contact['source']}\n")
+                    f.write("\n")
+                
+                f.write("-"*60 + "\n\n")
+        
+        print("✓ Saved summary to research_summary.txt")
+        print(f"\nTotal: {len(companies_processed)} companies, {len(self.all_contacts)} contacts")
+    
+    def run(self):
+        """Main execution method."""
+        try:
+            self.setup_driver()
+            
+            # Search job boards
+            companies = self.search_job_boards_for_companies()
+            
+            # Research each company
+            for i, company_name in enumerate(companies, 1):
+                print(f"\n[{i}/{len(companies)}] PROCESSING: {company_name}")
+                print("="*60)
+                
+                # Find company website
+                website_url = self.find_company_website(company_name)
+                
+                if website_url:
+                    # Scrape team members from website
+                    team_members = self.scrape_team_members_from_website(company_name, website_url)
+                    
+                    if team_members:
+                        self.all_contacts.extend(team_members)
+                        print(f"✓ Added {len(team_members)} contacts from {company_name}")
+                    else:
+                        print(f"⚠ No contacts found for {company_name}")
+                else:
+                    print(f"⚠ Could not find website for {company_name}")
+            
+            print("\n" + "="*60)
+            print("RESEARCH COMPLETED!")
+            print("="*60)
+            
+        except KeyboardInterrupt:
+            print("\n\nResearch interrupted by user")
+            
+        except Exception as e:
+            print(f"\nError during research: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+        finally:
+            self.save_results()
+            
+            if self.driver:
+                print("\nClosing browser...")
+                time.sleep(2)
+                self.driver.quit()
+
+
+def main():
+    """Main entry point."""
+    print("="*60)
+    print("COMPANY RESEARCH TOOL")
+    print("Finding companies from job boards and scraping team info")
+    print("="*60)
+    
+    input("\nPress ENTER to start...")
+    
+    researcher = CompanyResearcher()
+    researcher.run()
+    
+    print("\n✓ All results saved!")
+    print("  - company_contacts.csv (all contacts with LinkedIn)")
+    print("  - names_to_search.txt (names without LinkedIn)")
+    print("  - research_summary.txt (detailed report)")
+
+
+if __name__ == "__main__":
+    main()
         
     def human_delay(self, min_seconds=5, max_seconds=10):
         """Implement human-like delays."""
