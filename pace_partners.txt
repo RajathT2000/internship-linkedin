@@ -1,14 +1,65 @@
-# MQ PACE Partner Companies
-# Add one company name per line
-# Example companies (replace with actual MQ PACE partners):
+# AI Internship Companies in Sydney, Australia
+# Top companies and firms offering AI/ML internships
 
-Atlassian
-Accenture
-Commonwealth Bank
-Deloitte
+# Tech Giants
 Google
-IBM
 Microsoft
+Amazon Web Services
+IBM
+Atlassian
+
+# Consulting & Professional Services
+Accenture
+Deloitte
 PwC
-Telstra
+EY
+KPMG
+
+# Australian Banks & Financial Services
+Commonwealth Bank
 Westpac
+ANZ
+NAB
+Macquarie Group
+
+# Telecommunications
+Telstra
+Optus
+TPG Telecom
+
+# AI/ML Focused Companies
+Canva
+SafetyCulture
+Deputy
+Linktree
+Brighte
+
+# Startups & Scale-ups
+Airwallex
+Eucalyptus
+Koala
+Zeller
+Afterpay
+
+# Government & Research
+CSIRO
+Data61
+NSW Government (GovTECH)
+
+# E-commerce & Retail
+Woolworths Group
+Coles Group
+Kogan
+Catch Group
+
+# Media & Entertainment
+Nine Entertainment
+Seven West Media
+REA Group
+Domain Group
+
+# Healthcare & Biotech
+Cochlear
+ResMed
+Harrison.ai
+Annalise.ai

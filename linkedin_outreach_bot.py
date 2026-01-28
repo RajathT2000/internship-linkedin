@@ -80,9 +80,9 @@ class LinkedInOutreachBot:
             print(f"Login failed: {str(e)}")
             return False
     
-    def search_person(self, job_title, company_name):
+    def search_person(self, job_title, company_name, location="Sydney, Australia"):
         """Search for a person with specific job title at a company."""
-        search_query = f"{job_title} at {company_name}"
+        search_query = f"{job_title} at {company_name} in {location}"
         print(f"\nSearching for: {search_query}")
         
         try:
@@ -161,7 +161,9 @@ class LinkedInOutreachBot:
                 # Personalized message
                 message = f"""Hi {name.split()[0]},
 
-I am a Macquarie University student seeking an MQ PACE verified AI internship. I have built RAG agents and SQL automation tools and would love to explore opportunities at {company}.
+I'm a Macquarie University student seeking an MQ PACE verified AI internship in Sydney. I've built RAG agents, SQL automation tools, and have strong experience in Python and machine learning.
+
+I'd greatly appreciate any guidance or potential referral opportunities at {company}.
 
 Best regards"""
                 
@@ -208,7 +210,7 @@ Best regards"""
             })
             return False
     
-    def process_company(self, company_name, job_titles=['AI Lead', 'Engineering Manager']):
+    def process_company(self, company_name, job_titles=['AI Lead', 'Engineering Manager', 'Talent Acquisition', 'HR Manager']):
         """Process a single company - search for specific roles and send connection requests."""
         print(f"\n{'='*60}")
         print(f"Processing: {company_name}")
@@ -221,7 +223,7 @@ Best regards"""
                 if person['can_connect']:
                     success = self.send_connection_request(person)
                     if success:
-                        self.human_delay(15, 25)  # Extra delay after successful connection
+                        self.human_delay(20, 35)  # Extra delay after successful connection
                 else:
                     print(f"Cannot connect with {person['name']} - already connected or pending")
                     self.outreach_history.append({
@@ -232,7 +234,7 @@ Best regards"""
                         'status': 'skipped'
                     })
             
-            self.human_delay(10, 15)  # Delay between job title searches
+            self.human_delay(15, 25)  # Delay between job title searches
     
     def save_outreach_history(self, filename='outreach_history.csv'):
         """Save all outreach attempts to CSV file."""
@@ -263,7 +265,7 @@ Best regards"""
             
             for company in companies:
                 self.process_company(company)
-                self.human_delay(15, 25)  # Delay between companies
+                self.human_delay(25, 40)  # Delay between companies
             
             print("\n" + "="*60)
             print("Outreach campaign completed!")

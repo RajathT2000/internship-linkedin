@@ -1,0 +1,73 @@
+# Professional Connection Request Message Templates
+# Review and use these messages when reaching out on LinkedIn
+
+## Template 1: Direct Referral Request (Use with HR/Talent Acquisition)
+---
+Hi [First Name],
+
+I'm a Macquarie University student currently seeking an MQ PACE verified AI internship in Sydney. I've developed RAG agents, SQL automation tools, and have strong experience in Python and machine learning.
+
+I'd greatly appreciate any guidance or potential referral opportunities at [Company Name].
+
+Best regards,
+Rajath
+
+---
+
+## Template 2: AI/Engineering Manager Approach
+---
+Hi [First Name],
+
+I'm reaching out as a Macquarie University student passionate about AI and machine learning. I'm currently seeking an MQ PACE verified internship in Sydney and have built several projects including RAG agents and SQL automation systems.
+
+Would love to learn about any opportunities within [Company Name]'s AI team or get your guidance on breaking into the field.
+
+Thank you for your time!
+Rajath
+
+---
+
+## Template 3: General Professional Connection
+---
+Hi [First Name],
+
+I'm a Macquarie University student specializing in AI and machine learning, currently seeking an MQ PACE internship in Sydney. I've worked on RAG agents, SQL automation tools, and various ML projects.
+
+I'd appreciate the opportunity to connect and learn about potential internship opportunities at [Company Name].
+
+Best regards,
+Rajath
+
+---
+
+## Template 4: Technical Lead Approach
+---
+Hi [First Name],
+
+As a Macquarie University student focused on AI/ML, I'm seeking an MQ PACE verified internship in Sydney. I've built practical solutions including RAG agents and SQL automation tools, and I'm eager to contribute to real-world AI projects.
+
+Would be grateful for any insights or referral opportunities at [Company Name].
+
+Thank you!
+Rajath
+
+---
+
+## Key Points to Remember:
+✓ Always personalize with their first name
+✓ Mention Sydney location (important for local opportunities)
+✓ Highlight MQ PACE verification (shows legitimacy)
+✓ Keep it brief and respectful
+✓ Show genuine interest in their company
+✓ Mention specific skills (RAG agents, SQL automation)
+✓ Be polite and professional
+✓ Don't sound desperate - be confident but humble
+
+## DO NOT:
+✗ Use generic copy-paste messages
+✗ Be too pushy or demanding
+✗ Send multiple messages to the same person
+✗ Mention automation tools
+✗ Make spelling or grammar mistakes
+✗ Be overly casual or use emojis
+✗ Write long paragraphs (keep it concise)
