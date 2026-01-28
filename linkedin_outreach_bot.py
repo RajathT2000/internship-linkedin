@@ -14,6 +14,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import undetected_chromedriver as uc
+import re
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +30,31 @@ class LinkedInOutreachBot:
         delay = random.uniform(min_seconds, max_seconds)
         print(f"Waiting {delay:.1f} seconds...")
         time.sleep(delay)
+    
+    def add_natural_typos(self, text):
+        """Add natural spelling variations to avoid AI detection."""
+        # Common natural variations
+        variations = {
+            'internship': ['intership', 'internship', 'internshp'],
+            'opportunity': ['oportunity', 'opportunity', 'oppurtunity'],
+            'experience': ['experiance', 'experience', 'experince'],
+            'interested': ['intrested', 'interested', 'intersted'],
+            'currently': ['currenly', 'currently', 'curenttly'],
+            'appreciate': ['apreciate', 'appreciate', 'appriciate'],
+            'working': ['workng', 'working', 'workin'],
+            'university': ['university', 'univeristy', 'universtiy']
+        }
+        
+        result = text
+        # Apply 1-2 typos randomly
+        num_typos = random.randint(1, 2)
+        words_to_change = random.sample(list(variations.keys()), min(num_typos, len(variations)))
+        
+        for word in words_to_change:
+            if word in result:
+                result = result.replace(word, random.choice(variations[word]))
+        
+        return result
     
     def setup_driver(self):
         """Setup undetected ChromeDriver with anti-detection measures."""
@@ -66,6 +92,40 @@ class LinkedInOutreachBot:
         print("\n✓ Login confirmed! Starting automation...")
         self.human_delay(3, 5)
         return True
+    
+    def search_and_message_person(self, person_name, company_name):
+        """Search for a specific person on LinkedIn and send them a message."""
+        search_query = f"{person_name} {company_name}"
+        print(f"\nSearching LinkedIn for: {search_query}")
+        
+        try:
+            # Navigate to LinkedIn search
+            search_url = f'https://www.linkedin.com/search/results/people/?keywords={search_query.replace(" ", "%20")}'
+            self.driver.get(search_url)
+            self.human_delay(5, 8)
+            
+            # Get first result
+            results = self.driver.find_elements(By.XPATH, '//li[contains(@class, "reusable-search__result-container")]')
+            
+            if not results:
+                print(f"No results found for {person_name}")
+                return False
+            
+            # Click on first profile
+            first_result = results[0]
+            profile_link = first_result.find_element(By.XPATH, './/a[contains(@href, "/in/")]')
+            profile_url = profile_link.get_attribute('href')
+            
+            print(f"Found profile: {profile_url}")
+            self.driver.get(profile_url)
+            self.human_delay(5, 8)
+            
+            # Try to send message
+            return self.send_direct_message(person_name, company_name)
+            
+        except Exception as e:
+            print(f"Error searching for {person_name}: {str(e)}")
+            return False
     
     def search_person(self, job_title, company_name, location="Sydney, Australia"):
         """Search for a person with specific job title at a company."""
@@ -121,6 +181,86 @@ class LinkedInOutreachBot:
         except Exception as e:
             print(f"Search failed: {str(e)}")
             return []
+    
+    def send_direct_message(self, person_name, company_name):
+        """Send a direct message to a person."""
+        try:
+            print(f"\nPreparing to message {person_name}...")
+            
+            # Look for Message button
+            try:
+                message_buttons = self.driver.find_elements(By.XPATH, '//button[contains(@class, "message") or contains(., "Message")]')
+                
+                if not message_buttons:
+                    print(f"Cannot message {person_name} - Message button not available (might need connection or Premium)")
+                    self.outreach_history.append({
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'name': person_name,
+                        'company': company_name,
+                        'job_title': 'Tech Lead',
+                        'status': 'no_message_access'
+                    })
+                    return False
+                
+                message_buttons[0].click()
+                self.human_delay(3, 5)
+                
+                # Compose message with natural typos
+                base_message = f"""Hi {person_name.split()[0]},
+
+I'm a Macquarie University student currently seeking an AI internship in Sydney. I've been working on RAG agents and Python automation projects.
+
+I noticed {company_name} and was interested in learning more about potential opportunities or any guidance you might offer.
+
+Thank you for your time!
+
+Best regards,
+Rajath"""
+                
+                message = self.add_natural_typos(base_message)
+                
+                print("\n--- MESSAGE PREVIEW ---")
+                print(message)
+                print("--- END PREVIEW ---\n")
+                
+                # Ask for confirmation
+                confirm = input("Send this message? (yes/y to send, no/n to skip): ").strip().lower()
+                
+                if confirm not in ['yes', 'y']:
+                    print("Message skipped by user")
+                    return False
+                
+                # Type message
+                message_box = self.driver.find_element(By.XPATH, '//div[@role="textbox" or contains(@class, "msg-form__contenteditable")]')
+                message_box.click()
+                self.human_delay(1, 2)
+                message_box.send_keys(message)
+                self.human_delay(3, 5)
+                
+                # Send
+                send_button = self.driver.find_element(By.XPATH, '//button[contains(., "Send") and @type="submit"]')
+                send_button.click()
+                
+                print(f"✓ Message sent to {person_name}!")
+                
+                self.outreach_history.append({
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'name': person_name,
+                    'company': company_name,
+                    'job_title': 'Tech Lead',
+                    'status': 'message_sent'
+                })
+                
+                self.human_delay(20, 35)
+                return True
+                
+            except Exception as e:
+                print(f"Error sending message: {str(e)}")
+                return False
+                
+        except Exception as e:
+            print(f"Failed to message: {str(e)}")
+            return False
     
     def send_connection_request(self, person_info):
         """Send a personalized connection request."""
@@ -197,11 +337,53 @@ Best regards"""
             })
             return False
     
+    def research_company_website(self, company_name):
+        """Visit company website and look for team/about pages to find tech leads."""
+        print(f"\nResearching {company_name} website...")
+        
+        try:
+            # Google search for company
+            google_query = f"{company_name} careers team australia"
+            self.driver.get(f'https://www.google.com/search?q={google_query.replace(" ", "+")}')
+            self.human_delay(3, 5)
+            
+            # Get first few results
+            results = self.driver.find_elements(By.XPATH, '//div[@class="g"]//a')
+            
+            for result in results[:3]:
+                try:
+                    url = result.get_attribute('href')
+                    if url and 'linkedin' not in url.lower():
+                        print(f"Checking: {url}")
+                        self.driver.get(url)
+                        self.human_delay(5, 8)
+                        
+                        # Look for names on the page (simple heuristic)
+                        page_text = self.driver.find_element(By.TAG_NAME, 'body').text
+                        
+                        # Look for tech-related keywords
+                        if any(keyword in page_text.lower() for keyword in ['engineering', 'ai', 'machine learning', 'technology', 'data science']):
+                            print(f"Found relevant content on {url}")
+                            return True
+                        
+                except Exception as e:
+                    continue
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error researching website: {str(e)}")
+            return False
+    
     def process_company(self, company_name, job_titles=['AI Lead', 'Engineering Manager', 'Talent Acquisition', 'HR Manager']):
         """Process a single company - search for specific roles and send connection requests."""
         print(f"\n{'='*60}")
         print(f"Processing: {company_name}")
         print(f"{'='*60}")
+        
+        # First, research the company website
+        self.research_company_website(company_name)
+        self.human_delay(5, 10)
         
         for job_title in job_titles:
             people = self.search_person(job_title, company_name)
