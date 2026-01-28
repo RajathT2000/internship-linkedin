@@ -422,7 +422,7 @@ Best regards"""
             print("\nNo outreach history to save.")
     
     def run(self, companies):
-        """Main execution method."""
+        """Main execution method with interactive menu."""
         try:
             self.setup_driver()
             
@@ -430,22 +430,83 @@ Best regards"""
                 print("Failed to login. Exiting...")
                 return
             
-            print(f"\nStarting outreach to {len(companies)} companies...")
+            # Interactive menu loop
+            while True:
+                print("\n" + "="*60)
+                print("LINKEDIN OUTREACH BOT - INTERACTIVE MENU")
+                print("="*60)
+                print("1. Process all companies")
+                print("2. Process single company")
+                print("3. Search and message specific person")
+                print("4. View outreach history")
+                print("5. Save and exit")
+                print("6. Exit without saving")
+                print("="*60)
+                
+                choice = input("\nEnter your choice (1-6): ").strip()
+                
+                if choice == "1":
+                    print(f"\nStarting outreach to {len(companies)} companies...")
+                    for company in companies:
+                        self.process_company(company)
+                        self.human_delay(25, 40)
+                    print("\nOutreach campaign completed!")
+                    
+                elif choice == "2":
+                    print("\nAvailable companies:")
+                    for i, company in enumerate(companies, 1):
+                        print(f"{i}. {company}")
+                    company_num = input("\nEnter company number: ").strip()
+                    try:
+                        idx = int(company_num) - 1
+                        if 0 <= idx < len(companies):
+                            self.process_company(companies[idx])
+                        else:
+                            print("Invalid company number")
+                    except:
+                        print("Invalid input")
+                        
+                elif choice == "3":
+                    person_name = input("Enter person's name: ").strip()
+                    company_name = input("Enter company name: ").strip()
+                    if person_name and company_name:
+                        self.search_and_message_person(person_name, company_name)
+                    else:
+                        print("Name and company are required")
+                        
+                elif choice == "4":
+                    if self.outreach_history:
+                        print("\n--- OUTREACH HISTORY ---")
+                        for i, entry in enumerate(self.outreach_history, 1):
+                            print(f"{i}. {entry['name']} at {entry['company']} - Status: {entry['status']}")
+                        print(f"\nTotal: {len(self.outreach_history)} interactions")
+                    else:
+                        print("\nNo outreach history yet")
+                        
+                elif choice == "5":
+                    self.save_outreach_history()
+                    print("\nExiting...")
+                    break
+                    
+                elif choice == "6":
+                    confirm = input("Exit without saving history? (yes/y to confirm): ").strip().lower()
+                    if confirm in ['yes', 'y']:
+                        print("\nExiting without saving...")
+                        break
+                    
+                else:
+                    print("Invalid choice. Please enter 1-6")
             
-            for company in companies:
-                self.process_company(company)
-                self.human_delay(25, 40)  # Delay between companies
-            
-            print("\n" + "="*60)
-            print("Outreach campaign completed!")
-            print("="*60)
+        except KeyboardInterrupt:
+            print("\n\nBot interrupted by user")
+            save_choice = input("Save outreach history before exiting? (yes/y): ").strip().lower()
+            if save_choice in ['yes', 'y']:
+                self.save_outreach_history()
             
         except Exception as e:
             print(f"\nError during execution: {str(e)}")
             
         finally:
-            self.save_outreach_history()
-            
             if self.driver:
                 print("\nClosing browser...")
                 self.human_delay(3, 5)
