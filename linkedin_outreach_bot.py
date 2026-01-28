@@ -21,13 +21,8 @@ load_dotenv()
 class LinkedInOutreachBot:
     def __init__(self):
         """Initialize the LinkedIn automation bot."""
-        self.email = os.getenv('LINKEDIN_EMAIL')
-        self.password = os.getenv('LINKEDIN_PASSWORD')
         self.driver = None
         self.outreach_history = []
-        
-        if not self.email or not self.password:
-            raise ValueError("LinkedIn credentials not found in .env file")
     
     def human_delay(self, min_seconds=10, max_seconds=20):
         """Implement human-like delays to avoid detection."""
@@ -47,38 +42,30 @@ class LinkedInOutreachBot:
         print("Chrome driver ready!")
     
     def login_to_linkedin(self):
-        """Log into LinkedIn using credentials from .env file."""
-        print("Navigating to LinkedIn...")
-        self.driver.get('https://www.linkedin.com/login')
-        self.human_delay(3, 5)
+        """Navigate to LinkedIn and wait for manual login."""
+        print("Opening LinkedIn...")
+        print("\n" + "="*60)
+        print("PLEASE LOG IN MANUALLY")
+        print("="*60)
+        print("1. The browser will open LinkedIn")
+        print("2. Log in with your credentials")
+        print("3. Complete any security checks (2FA, captcha, etc.)")
+        print("4. Wait on the LinkedIn home/feed page")
+        print("="*60)
         
-        try:
-            # Enter email
-            print("Entering email...")
-            email_field = self.wait.until(
-                EC.presence_of_element_located((By.ID, 'username'))
-            )
-            email_field.send_keys(self.email)
-            self.human_delay(2, 4)
-            
-            # Enter password
-            print("Entering password...")
-            password_field = self.driver.find_element(By.ID, 'password')
-            password_field.send_keys(self.password)
-            self.human_delay(2, 4)
-            
-            # Click sign in
-            print("Signing in...")
-            sign_in_button = self.driver.find_element(By.XPATH, '//button[@type="submit"]')
-            sign_in_button.click()
-            self.human_delay(5, 8)
-            
-            print("Successfully logged in!")
-            return True
-            
-        except Exception as e:
-            print(f"Login failed: {str(e)}")
-            return False
+        self.driver.get('https://www.linkedin.com')
+        
+        # Wait for user confirmation
+        while True:
+            response = input("\nDid you login successfully? (yes/y to continue): ").strip().lower()
+            if response in ['yes', 'y']:
+                break
+            else:
+                print("Please complete the login and then type 'yes' or 'y'")
+        
+        print("\n✓ Login confirmed! Starting automation...")
+        self.human_delay(3, 5)
+        return True
     
     def search_person(self, job_title, company_name, location="Sydney, Australia"):
         """Search for a person with specific job title at a company."""
