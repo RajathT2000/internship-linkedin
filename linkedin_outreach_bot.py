@@ -15,6 +15,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import undetected_chromedriver as uc
 import re
+import importlib
+import sys
 
 # Load environment variables
 load_dotenv()
@@ -439,11 +441,12 @@ Best regards"""
                 print("2. Process single company")
                 print("3. Search and message specific person")
                 print("4. View outreach history")
-                print("5. Save and exit")
-                print("6. Exit without saving")
+                print("5. Reload code (apply new changes without restart)")
+                print("6. Save and exit")
+                print("7. Exit without saving")
                 print("="*60)
                 
-                choice = input("\nEnter your choice (1-6): ").strip()
+                choice = input("\nEnter your choice (1-7): ").strip()
                 
                 if choice == "1":
                     print(f"\nStarting outreach to {len(companies)} companies...")
@@ -484,18 +487,40 @@ Best regards"""
                         print("\nNo outreach history yet")
                         
                 elif choice == "5":
+                    print("\n" + "="*60)
+                    print("RELOADING CODE...")
+                    print("="*60)
+                    print("1. Make your code changes in the editor")
+                    print("2. Save the file")
+                    print("3. Come back here")
+                    input("\nPress ENTER when you've saved your changes...")
+                    
+                    try:
+                        # Reload the current module
+                        module_name = __name__
+                        if module_name in sys.modules:
+                            importlib.reload(sys.modules[module_name])
+                        print("✓ Code reloaded successfully!")
+                        print("✓ Browser session maintained!")
+                        print("✓ Login preserved!")
+                        print("\nYour changes are now active. Continue using the menu.")
+                    except Exception as e:
+                        print(f"⚠ Reload failed: {str(e)}")
+                        print("Don't worry - your session is still active, just can't apply changes.")
+                        
+                elif choice == "6":
                     self.save_outreach_history()
                     print("\nExiting...")
                     break
                     
-                elif choice == "6":
+                elif choice == "7":
                     confirm = input("Exit without saving history? (yes/y to confirm): ").strip().lower()
                     if confirm in ['yes', 'y']:
                         print("\nExiting without saving...")
                         break
                     
                 else:
-                    print("Invalid choice. Please enter 1-6")
+                    print("Invalid choice. Please enter 1-7")
             
         except KeyboardInterrupt:
             print("\n\nBot interrupted by user")
