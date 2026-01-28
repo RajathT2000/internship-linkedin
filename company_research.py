@@ -32,16 +32,16 @@ class CompanyResearcher:
         print("Chrome driver ready!")
     
     def search_job_boards_for_companies(self):
-        """Search Seek and Indeed for companies offering internships in Sydney."""
+        """Search Seek and Indeed for companies offering AI internships in Sydney."""
         print("\n" + "="*60)
-        print("SEARCHING JOB BOARDS FOR COMPANIES")
+        print("SEARCHING JOB BOARDS FOR AI INTERNSHIPS")
         print("="*60)
         
         companies_found = set()
         job_boards = [
-            ('Seek', 'https://www.seek.com.au/internship-jobs/in-Sydney-NSW?daterange=31'),
-            ('Indeed', 'https://au.indeed.com/jobs?q=internship&l=Sydney+NSW'),
-            ('Jora', 'https://au.jora.com/jobs?q=internship&l=Sydney+NSW')
+            ('Seek', 'https://www.seek.com.au/ai-internship-jobs/in-Sydney-NSW?daterange=31'),
+            ('Indeed', 'https://au.indeed.com/jobs?q=ai+internship+OR+machine+learning+internship&l=Sydney+NSW'),
+            ('Jora', 'https://au.jora.com/jobs?q=ai+internship&l=Sydney+NSW')
         ]
         
         for board_name, url in job_boards:
@@ -79,8 +79,12 @@ class CompanyResearcher:
         return companies_list
     
     def find_company_website(self, company_name):
-        """Find the official website of a company."""
+        """Find and verify the official website of a company."""
         try:
+            # Open new tab for website verification
+            self.driver.execute_script("window.open('');")
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            
             search_query = f"{company_name} Sydney Australia official website"
             google_url = f'https://www.google.com/search?q={search_query.replace(" ", "+")}'
             
@@ -93,15 +97,40 @@ class CompanyResearcher:
             for link in links[:5]:
                 try:
                     url = link.get_attribute('href')
-                    if url and not any(x in url.lower() for x in ['linkedin', 'indeed', 'seek', 'jora', 'google', 'facebook']):
-                        print(f"  Found website: {url}")
-                        return url
+                    if url and not any(x in url.lower() for x in ['linkedin', 'indeed', 'seek', 'jora', 'google', 'facebook', 'youtube']):
+                        print(f"  Verifying website: {url}")
+                        
+                        # Try to visit the website to verify it exists
+                        try:
+                            self.driver.get(url)
+                            time.sleep(2)
+                            
+                            # Check if page loaded successfully
+                            if "404" not in self.driver.title and "not found" not in self.driver.title.lower():
+                                print(f"  ✓ Website verified: {url}")
+                                # Close verification tab
+                                self.driver.close()
+                                self.driver.switch_to.window(self.driver.window_handles[0])
+                                return url
+                            else:
+                                print(f"  ✗ Website not accessible (404)")
+                        except:
+                            print(f"  ✗ Website failed to load")
+                            continue
                 except:
                     continue
             
+            # Close verification tab and return to main tab
+            self.driver.close()
+            self.driver.switch_to.window(self.driver.window_handles[0])
+            print(f"  ✗ No valid website found for {company_name}")
             return None
             
         except Exception as e:
+            # Make sure we're back to main tab
+            if len(self.driver.window_handles) > 1:
+                self.driver.close()
+                self.driver.switch_to.window(self.driver.window_handles[0])
             print(f"Error finding website: {str(e)}")
             return None
     
@@ -112,7 +141,11 @@ class CompanyResearcher:
         team_members = []
         
         try:
-            # Visit main website
+            # Open new tab for scraping
+            self.driver.execute_script("window.open('');")
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            
+            # Visit website
             self.driver.get(website_url)
             time.sleep(3)
             
@@ -202,9 +235,17 @@ class CompanyResearcher:
                 google_members = self.search_google_for_team_members(company_name)
                 team_members.extend(google_members)
             
+            # Close scraping tab and return to main tab
+            self.driver.close()
+            self.driver.switch_to.window(self.driver.window_handles[0])
+            
             return team_members[:2]  # Return max 2
             
         except Exception as e:
+            # Make sure we're back to main tab
+            if len(self.driver.window_handles) > 1:
+                self.driver.close()
+                self.driver.switch_to.window(self.driver.window_handles[0])
             print(f"Error scraping website: {str(e)}")
             return []
     
@@ -308,32 +349,45 @@ class CompanyResearcher:
         try:
             self.setup_driver()
             
-            # Search job boards
+            # Search job boards (keeps job board in main tab)
             companies = self.search_job_boards_for_companies()
+            
+            companies_processed = 0
+            companies_skipped = 0
             
             # Research each company
             for i, company_name in enumerate(companies, 1):
+                if companies_processed >= 20:
+                    print(f"\n✓ Reached 20 companies with valid websites!")
+                    break
+                    
                 print(f"\n[{i}/{len(companies)}] PROCESSING: {company_name}")
                 print("="*60)
                 
-                # Find company website
+                # Find and verify company website (uses new tab)
                 website_url = self.find_company_website(company_name)
                 
                 if website_url:
-                    # Scrape team members from website
+                    # Scrape team members from website (uses new tab)
                     team_members = self.scrape_team_members_from_website(company_name, website_url)
                     
                     if team_members:
                         self.all_contacts.extend(team_members)
-                        print(f"✓ Added {len(team_members)} contacts from {company_name}")
+                        companies_processed += 1
+                        print(f"✓ Added {len(team_members)} contacts from {company_name} ({companies_processed}/20)")
                     else:
                         print(f"⚠ No contacts found for {company_name}")
+                        companies_skipped += 1
                 else:
-                    print(f"⚠ Could not find website for {company_name}")
+                    print(f"✗ No valid website for {company_name}, skipping...")
+                    companies_skipped += 1
+                    # Continue to next company from job board
             
             print("\n" + "="*60)
             print("RESEARCH COMPLETED!")
             print("="*60)
+            print(f"Companies with contacts: {companies_processed}")
+            print(f"Companies skipped: {companies_skipped}")
             
         except KeyboardInterrupt:
             print("\n\nResearch interrupted by user")
@@ -355,8 +409,9 @@ class CompanyResearcher:
 def main():
     """Main entry point."""
     print("="*60)
-    print("COMPANY RESEARCH TOOL")
-    print("Finding companies from job boards and scraping team info")
+    print("AI INTERNSHIP COMPANY RESEARCH TOOL")
+    print("Finding AI internship companies and scraping team info")
+    print("Sydney, Australia")
     print("="*60)
     
     input("\nPress ENTER to start...")
