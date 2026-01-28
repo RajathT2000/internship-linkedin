@@ -96,29 +96,41 @@ class LinkedInOutreachBot:
         return True
     
     def search_and_message_person(self, person_name, company_name):
-        """Search for a specific person on LinkedIn and send them a message."""
-        search_query = f"{person_name} {company_name}"
-        print(f"\nSearching LinkedIn for: {search_query}")
+        """Search for a specific person via Google and send them a LinkedIn message."""
+        search_query = f"{person_name} {company_name} site:linkedin.com/in"
+        print(f"\nSearching Google for: {search_query}")
         
         try:
-            # Navigate to LinkedIn search
-            search_url = f'https://www.linkedin.com/search/results/people/?keywords={search_query.replace(" ", "%20")}'
-            self.driver.get(search_url)
-            self.human_delay(5, 8)
+            # Use Google to find LinkedIn profile
+            google_url = f'https://www.google.com/search?q={search_query.replace(" ", "+")}'
+            self.driver.get(google_url)
+            self.human_delay(4, 7)
             
-            # Get first result
-            results = self.driver.find_elements(By.XPATH, '//li[contains(@class, "reusable-search__result-container")]')
+            # Extract LinkedIn profile URLs from Google results
+            links = self.driver.find_elements(By.XPATH, '//a[@href]')
+            profile_urls = []
             
-            if not results:
-                print(f"No results found for {person_name}")
+            for link in links:
+                try:
+                    url = link.get_attribute('href')
+                    if url and 'linkedin.com/in/' in url and '/search/' not in url:
+                        # Clean the URL (remove Google redirect)
+                        if 'url?q=' in url:
+                            url = url.split('url?q=')[1].split('&')[0]
+                        if url not in profile_urls:
+                            profile_urls.append(url)
+                except:
+                    continue
+            
+            if not profile_urls:
+                print(f"No LinkedIn profiles found for {person_name} at {company_name}")
                 return False
             
-            # Click on first profile
-            first_result = results[0]
-            profile_link = first_result.find_element(By.XPATH, './/a[contains(@href, "/in/")]')
-            profile_url = profile_link.get_attribute('href')
+            # Use the first profile found
+            profile_url = profile_urls[0]
+            print(f"Found profile via Google: {profile_url}")
             
-            print(f"Found profile: {profile_url}")
+            # Visit the LinkedIn profile
             self.driver.get(profile_url)
             self.human_delay(5, 8)
             
@@ -130,55 +142,54 @@ class LinkedInOutreachBot:
             return False
     
     def search_person(self, job_title, company_name, location="Sydney, Australia"):
-        """Search for a person with specific job title at a company."""
-        search_query = f"{job_title} at {company_name} in {location}"
-        print(f"\nSearching for: {search_query}")
+        """Search for people via Google and return LinkedIn profiles."""
+        search_query = f"{job_title} {company_name} {location} site:linkedin.com/in"
+        print(f"\nSearching Google for: {search_query}")
         
         try:
-            # Navigate to LinkedIn search
-            self.driver.get('https://www.linkedin.com/search/results/people/')
-            self.human_delay(3, 5)
+            # Use Google to find LinkedIn profiles
+            google_url = f'https://www.google.com/search?q={search_query.replace(" ", "+")}'
+            self.driver.get(google_url)
+            self.human_delay(4, 7)
             
-            # Find and use search box
-            search_box = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, '//input[@placeholder="Search"]'))
-            )
-            search_box.clear()
-            search_box.send_keys(search_query)
-            search_box.send_keys(Keys.RETURN)
-            self.human_delay(5, 8)
+            # Extract LinkedIn profile URLs from Google results
+            links = self.driver.find_elements(By.XPATH, '//a[@href]')
+            profile_data = []
             
-            # Get search results
-            results = self.driver.find_elements(By.XPATH, '//li[contains(@class, "reusable-search__result-container")]')
-            
-            if not results:
-                print(f"No results found for {search_query}")
-                return []
-            
-            people_found = []
-            for i, result in enumerate(results[:3]):  # Limit to top 3 results
+            for link in links[:10]:  # Check first 10 links
                 try:
-                    name_element = result.find_element(By.XPATH, './/span[@dir="ltr"]//span[@aria-hidden="true"]')
-                    name = name_element.text
-                    
-                    # Try to find Connect button
-                    connect_buttons = result.find_elements(By.XPATH, './/button[contains(@aria-label, "Invite") or contains(text(), "Connect")]')
-                    
-                    people_found.append({
-                        'name': name,
-                        'company': company_name,
-                        'job_title': job_title,
-                        'can_connect': len(connect_buttons) > 0,
-                        'element': result
-                    })
-                    
-                    print(f"Found: {name} ({job_title}) at {company_name}")
-                    
-                except Exception as e:
-                    print(f"Could not extract info from result {i+1}: {str(e)}")
+                    url = link.get_attribute('href')
+                    if url and 'linkedin.com/in/' in url and '/search/' not in url:
+                        # Clean the URL (remove Google redirect)
+                        if 'url?q=' in url:
+                            url = url.split('url?q=')[1].split('&')[0]
+                        
+                        # Try to extract name from link text
+                        link_text = link.text.strip()
+                        
+                        if url not in [p['profile_url'] for p in profile_data]:
+                            profile_data.append({
+                                'name': link_text if link_text else 'Unknown',
+                                'company': company_name,
+                                'job_title': job_title,
+                                'profile_url': url,
+                                'can_connect': True
+                            })
+                            
+                            if len(profile_data) >= 3:  # Limit to 3 profiles
+                                break
+                except:
                     continue
             
-            return people_found
+            if not profile_data:
+                print(f"No profiles found for {job_title} at {company_name}")
+                return []
+            
+            print(f"Found {len(profile_data)} profiles via Google")
+            for person in profile_data:
+                print(f"  - {person['name']}: {person['profile_url']}")
+            
+            return profile_data
             
         except Exception as e:
             print(f"Search failed: {str(e)}")
@@ -391,19 +402,18 @@ Best regards"""
             people = self.search_person(job_title, company_name)
             
             for person in people:
-                if person['can_connect']:
-                    success = self.send_connection_request(person)
-                    if success:
-                        self.human_delay(20, 35)  # Extra delay after successful connection
+                # Visit the profile
+                print(f"\nVisiting profile: {person['profile_url']}")
+                self.driver.get(person['profile_url'])
+                self.human_delay(5, 8)
+                
+                # Try to send message
+                success = self.send_direct_message(person['name'], company_name)
+                
+                if success:
+                    self.human_delay(20, 35)  # Extra delay after successful message
                 else:
-                    print(f"Cannot connect with {person['name']} - already connected or pending")
-                    self.outreach_history.append({
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'name': person['name'],
-                        'company': company_name,
-                        'job_title': job_title,
-                        'status': 'skipped'
-                    })
+                    self.human_delay(8, 12)  # Shorter delay if message failed
             
             self.human_delay(15, 25)  # Delay between job title searches
     
