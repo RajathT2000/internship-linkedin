@@ -1,0 +1,14 @@
+# MQ PACE Partner Companies
+# Add one company name per line
+# Example companies (replace with actual MQ PACE partners):
+
+Atlassian
+Accenture
+Commonwealth Bank
+Deloitte
+Google
+IBM
+Microsoft
+PwC
+Telstra
+Westpac
