@@ -1,10 +1,9 @@
 """
-MQ PACE Company Research Tool
-Searches job boards for companies, scrapes their websites for team members
+AI Internship Company Finder
+Searches job boards and filters for relevant AI/ML internships
 """
 
 import time
-import random
 import pandas as pd
 from datetime import datetime
 from selenium.webdriver.common.by import By
@@ -18,8 +17,7 @@ class CompanyResearcher:
     def __init__(self):
         """Initialize the research tool."""
         self.driver = None
-        self.companies_data = []
-        self.all_contacts = []
+        self.companies_list = []
         
     def setup_driver(self):
         """Setup undetected ChromeDriver."""
@@ -31,13 +29,42 @@ class CompanyResearcher:
         self.wait = WebDriverWait(self.driver, 15)
         print("Chrome driver ready!")
     
+    def is_relevant_ai_internship(self, job_description):
+        """Check if the job description is actually for AI/ML/tech internship."""
+        description_lower = job_description.lower()
+        
+        # Positive keywords - must have at least one
+        positive_keywords = [
+            'artificial intelligence', 'machine learning', 'ai', 'ml', 'data science',
+            'python', 'tensorflow', 'pytorch', 'deep learning', 'neural network',
+            'computer vision', 'nlp', 'natural language', 'data analysis', 'software',
+            'algorithm', 'model', 'automation', 'programming', 'coding'
+        ]
+        
+        # Negative keywords - if present, likely not relevant
+        negative_keywords = [
+            'medical intern', 'clinical', 'hospital', 'patient care', 'nursing',
+            'physician', 'doctor', 'healthcare provider', 'medical student',
+            'residency', 'clinical rotation'
+        ]
+        
+        # Check for negative keywords first
+        if any(keyword in description_lower for keyword in negative_keywords):
+            return False
+        
+        # Check for positive keywords
+        if any(keyword in description_lower for keyword in positive_keywords):
+            return True
+        
+        return False
+    
     def search_job_boards_for_companies(self):
-        """Search Seek and Indeed for companies offering AI internships in Sydney."""
+        """Search job boards for companies offering AI internships in Sydney."""
         print("\n" + "="*60)
         print("SEARCHING JOB BOARDS FOR AI INTERNSHIPS")
         print("="*60)
         
-        companies_found = set()
+        companies_found = {}  # {company_name: job_description}
         job_boards = [
             ('Seek', 'https://www.seek.com.au/ai-internship-jobs/in-Sydney-NSW?daterange=31'),
             ('Indeed', 'https://au.indeed.com/jobs?q=ai+internship+OR+machine+learning+internship&l=Sydney+NSW'),
@@ -50,32 +77,105 @@ class CompanyResearcher:
                 self.driver.get(url)
                 time.sleep(3)
                 
-                # Extract company names from job listings
+                # Extract company names and job descriptions
                 if board_name == 'Seek':
-                    company_elements = self.driver.find_elements(By.XPATH, '//a[@data-automation="jobCompany"]')
+                    job_cards = self.driver.find_elements(By.XPATH, '//article[@data-automation="normalJob"]')
+                    
+                    for card in job_cards[:50]:
+                        try:
+                            company_elem = card.find_element(By.XPATH, './/a[@data-automation="jobCompany"]')
+                            company_name = company_elem.text.strip()
+                            
+                            # Click to see full description
+                            try:
+                                card.click()
+                                time.sleep(1)
+                                
+                                # Get job description
+                                desc_elem = self.driver.find_element(By.XPATH, '//div[@data-automation="jobAdDetails"]')
+                                job_description = desc_elem.text
+                                
+                                # Check if relevant
+                                if company_name and self.is_relevant_ai_internship(job_description):
+                                    if company_name not in companies_found:
+                                        companies_found[company_name] = job_description[:200]
+                                        print(f"  ✓ {company_name}")
+                                else:
+                                    print(f"  ✗ {company_name} (not relevant AI internship)")
+                            except:
+                                continue
+                                
+                        except:
+                            continue
+                
                 elif board_name == 'Indeed':
-                    company_elements = self.driver.find_elements(By.XPATH, '//span[@class="companyName"]')
+                    job_cards = self.driver.find_elements(By.XPATH, '//div[contains(@class, "job_seen_beacon")]')
+                    
+                    for card in job_cards[:50]:
+                        try:
+                            company_elem = card.find_element(By.XPATH, './/span[@class="companyName"]')
+                            company_name = company_elem.text.strip()
+                            
+                            # Try to get job description
+                            try:
+                                card.click()
+                                time.sleep(1)
+                                
+                                desc_elem = self.driver.find_element(By.XPATH, '//div[@id="jobDescriptionText"]')
+                                job_description = desc_elem.text
+                                
+                                if company_name and self.is_relevant_ai_internship(job_description):
+                                    if company_name not in companies_found:
+                                        companies_found[company_name] = job_description[:200]
+                                        print(f"  ✓ {company_name}")
+                                else:
+                                    print(f"  ✗ {company_name} (not relevant AI internship)")
+                            except:
+                                continue
+                                
+                        except:
+                            continue
+                
                 else:  # Jora
-                    company_elements = self.driver.find_elements(By.XPATH, '//div[contains(@class, "company")]')
+                    job_links = self.driver.find_elements(By.XPATH, '//a[contains(@class, "job-link")]')
+                    
+                    for link in job_links[:50]:
+                        try:
+                            # Get company name from nearby element
+                            parent = link.find_element(By.XPATH, './..')
+                            company_elem = parent.find_element(By.XPATH, './/div[contains(@class, "company")]')
+                            company_name = company_elem.text.strip()
+                            
+                            # Click to see description
+                            try:
+                                link.click()
+                                time.sleep(1)
+                                
+                                desc_elem = self.driver.find_element(By.XPATH, '//div[contains(@class, "description")]')
+                                job_description = desc_elem.text
+                                
+                                if company_name and self.is_relevant_ai_internship(job_description):
+                                    if company_name not in companies_found:
+                                        companies_found[company_name] = job_description[:200]
+                                        print(f"  ✓ {company_name}")
+                                else:
+                                    print(f"  ✗ {company_name} (not relevant AI internship)")
+                            except:
+                                continue
+                                
+                        except:
+                            continue
                 
-                for element in company_elements[:30]:  # Check first 30 listings
-                    try:
-                        company_name = element.text.strip()
-                        if company_name and len(company_name) > 2:
-                            companies_found.add(company_name)
-                            print(f"  ✓ Found: {company_name}")
-                    except:
-                        continue
-                
-                if len(companies_found) >= 20:
+                if len(companies_found) >= 100:
+                    print(f"\n✓ Reached 100 companies!")
                     break
                     
             except Exception as e:
                 print(f"Error searching {board_name}: {str(e)}")
                 continue
         
-        companies_list = list(companies_found)[:20]
-        print(f"\n✓ Found {len(companies_list)} companies offering internships")
+        companies_list = list(companies_found.keys())[:100]
+        print(f"\n✓ Found {len(companies_list)} relevant AI internship companies")
         return companies_list
     
     def find_company_website(self, company_name):
@@ -291,115 +391,57 @@ class CompanyResearcher:
             print(f"Error searching Google: {str(e)}")
             return []
     
-    def save_results(self):
-        """Save all research results to files."""
+    def save_results(self, companies):
+        """Save company list to files."""
         print("\n" + "="*60)
         print("SAVING RESULTS")
         print("="*60)
         
-        # Save all contacts to CSV
-        if self.all_contacts:
-            df = pd.DataFrame(self.all_contacts)
-            df.to_csv('company_contacts.csv', index=False)
-            print(f"✓ Saved {len(self.all_contacts)} contacts to company_contacts.csv")
+        # Save to CSV
+        df = pd.DataFrame({'Company Name': companies})
+        df.to_csv('ai_internship_companies.csv', index=False)
+        print(f"✓ Saved {len(companies)} companies to ai_internship_companies.csv")
         
-        # Save names without LinkedIn to text file
-        contacts_without_linkedin = [c for c in self.all_contacts if c['linkedin_url'] == 'Not found']
-        
-        if contacts_without_linkedin:
-            with open('names_to_search.txt', 'w', encoding='utf-8') as f:
-                f.write("NAMES TO SEARCH ON LINKEDIN\n")
-                f.write("="*60 + "\n\n")
-                
-                for contact in contacts_without_linkedin:
-                    f.write(f"{contact['name']} - {contact['company']}\n")
-            
-            print(f"✓ Saved {len(contacts_without_linkedin)} names to names_to_search.txt")
-        
-        # Save detailed report
-        with open('research_summary.txt', 'w', encoding='utf-8') as f:
-            f.write("COMPANY RESEARCH SUMMARY\n")
+        # Save to text file
+        with open('company_list.txt', 'w', encoding='utf-8') as f:
+            f.write("AI INTERNSHIP COMPANIES - SYDNEY, AUSTRALIA\n")
             f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write("="*60 + "\n\n")
             
-            companies_processed = {}
-            for contact in self.all_contacts:
-                company = contact['company']
-                if company not in companies_processed:
-                    companies_processed[company] = []
-                companies_processed[company].append(contact)
-            
-            for company, contacts in companies_processed.items():
-                f.write(f"COMPANY: {company}\n")
-                f.write(f"Team Members Found: {len(contacts)}\n\n")
-                
-                for contact in contacts:
-                    f.write(f"  Name: {contact['name']}\n")
-                    f.write(f"  LinkedIn: {contact['linkedin_url']}\n")
-                    f.write(f"  Source: {contact['source']}\n")
-                    f.write("\n")
-                
-                f.write("-"*60 + "\n\n")
+            for i, company in enumerate(companies, 1):
+                f.write(f"{i}. {company}\n")
         
-        print("✓ Saved summary to research_summary.txt")
-        print(f"\nTotal: {len(companies_processed)} companies, {len(self.all_contacts)} contacts")
+        print(f"✓ Saved company list to company_list.txt")
+        print(f"\nTotal: {len(companies)} AI internship companies")
     
     def run(self):
         """Main execution method."""
         try:
             self.setup_driver()
             
-            # Search job boards (keeps job board in main tab)
+            print("\nStarting automatic search...")
+            
+            # Search job boards and filter
             companies = self.search_job_boards_for_companies()
             
-            companies_processed = 0
-            companies_skipped = 0
-            
-            # Research each company
-            for i, company_name in enumerate(companies, 1):
-                if companies_processed >= 20:
-                    print(f"\n✓ Reached 20 companies with valid websites!")
-                    break
-                    
-                print(f"\n[{i}/{len(companies)}] PROCESSING: {company_name}")
-                print("="*60)
-                
-                # Find and verify company website (uses new tab)
-                website_url = self.find_company_website(company_name)
-                
-                if website_url:
-                    # Scrape team members from website (uses new tab)
-                    team_members = self.scrape_team_members_from_website(company_name, website_url)
-                    
-                    if team_members:
-                        self.all_contacts.extend(team_members)
-                        companies_processed += 1
-                        print(f"✓ Added {len(team_members)} contacts from {company_name} ({companies_processed}/20)")
-                    else:
-                        print(f"⚠ No contacts found for {company_name}")
-                        companies_skipped += 1
-                else:
-                    print(f"✗ No valid website for {company_name}, skipping...")
-                    companies_skipped += 1
-                    # Continue to next company from job board
-            
             print("\n" + "="*60)
-            print("RESEARCH COMPLETED!")
+            print("SEARCH COMPLETED!")
             print("="*60)
-            print(f"Companies with contacts: {companies_processed}")
-            print(f"Companies skipped: {companies_skipped}")
+            print(f"Found {len(companies)} relevant AI internship companies")
+            
+            self.save_results(companies)
             
         except KeyboardInterrupt:
-            print("\n\nResearch interrupted by user")
+            print("\n\nSearch interrupted by user")
+            if self.companies_list:
+                self.save_results(self.companies_list)
             
         except Exception as e:
-            print(f"\nError during research: {str(e)}")
+            print(f"\nError during search: {str(e)}")
             import traceback
             traceback.print_exc()
             
         finally:
-            self.save_results()
-            
             if self.driver:
                 print("\nClosing browser...")
                 time.sleep(2)
@@ -409,20 +451,23 @@ class CompanyResearcher:
 def main():
     """Main entry point."""
     print("="*60)
-    print("AI INTERNSHIP COMPANY RESEARCH TOOL")
-    print("Finding AI internship companies and scraping team info")
+    print("AI INTERNSHIP COMPANY FINDER")
     print("Sydney, Australia")
     print("="*60)
-    
-    input("\nPress ENTER to start...")
+    print("\nSearching job boards for AI/ML internships...")
+    print("Filtering out medical internships and non-tech roles...")
+    print("Target: 100 companies\n")
     
     researcher = CompanyResearcher()
     researcher.run()
     
-    print("\n✓ All results saved!")
-    print("  - company_contacts.csv (all contacts with LinkedIn)")
-    print("  - names_to_search.txt (names without LinkedIn)")
-    print("  - research_summary.txt (detailed report)")
+    print("\n✓ Results saved!")
+    print("  - ai_internship_companies.csv")
+    print("  - company_list.txt")
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
